@@ -1,0 +1,40 @@
+# Local credentials and provider configuration
+model.json
+model.local.json
+.env
+.env.*
+!.env.example
+
+# Python environments and caches
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Experiment checkpoints and generated outputs
+experiment_outputs/
+outputs/
+out/
+*.jsonl
+*_progress.json
+*_balance_stop.json
+*.log
+
+# Local tools and editor state
+.codex/
+.idea/
+.vscode/
+node_modules/
+tmp/
+temp/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+

@@ -1,0 +1,58 @@
+[
+  {
+    "provider": "deepseek",
+    "protocol": "openai",
+    "base_url": "https://api.deepseek.com",
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "model": [
+      {
+        "name": "DeepSeek-V4-Pro",
+        "full_name": "deepseek-v4-pro"
+      },
+      {
+        "name": "DeepSeek-V4-Flash",
+        "full_name": "deepseek-v4-flash"
+      }
+    ]
+  },
+  {
+    "provider": "siliconflow",
+    "protocol": "openai",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "api_key_env": "SILICONFLOW_API_KEY",
+    "model": [
+      {
+        "name": "Qwen3.5-4B",
+        "full_name": "Qwen/Qwen3.5-4B"
+      },
+      {
+        "name": "Qwen3-8B",
+        "full_name": "Qwen/Qwen3-8B"
+      },
+      {
+        "name": "Qwen3.5-9B",
+        "full_name": "Qwen/Qwen3.5-9B"
+      },
+      {
+        "name": "Qwen3.5-27B",
+        "full_name": "Qwen/Qwen3.5-27B"
+      },
+      {
+        "name": "Qwen3.5-35B-A3B",
+        "full_name": "Qwen/Qwen3.5-35B-A3B"
+      },
+      {
+        "name": "GLM-5.2",
+        "full_name": "zai-org/GLM-5.2"
+      },
+      {
+        "name": "Qwen3.5-397B-A17B",
+        "full_name": "Qwen/Qwen3.5-397B-A17B"
+      },
+      {
+        "name": "Kimi-K2.6",
+        "full_name": "Pro/moonshotai/Kimi-K2.6"
+      }
+    ]
+  }
+]
