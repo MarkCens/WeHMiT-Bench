@@ -64,8 +64,8 @@ Return one JSON object with exactly these fields: label, explanation, confidence
 def parse_args():
     # Evaluate every Core title and OOD title by default.
     parser = argparse.ArgumentParser(description="Detect potentially misleading health claims with configured LLMs.")
-    parser.add_argument("--core-file", "--test-file", dest="core_file", default=f"{DEFAULT_OUTPUT_DIR}/01_core_health_set.csv", help="Full Core Health Set CSV.")
-    parser.add_argument("--ood-file", default=f"{DEFAULT_OUTPUT_DIR}/01_out_of_domain_set.csv", help="Out-of-Domain Set CSV.")
+    parser.add_argument("--core-file", "--test-file", dest="core_file", default="WeHMiT-Bench_Core.csv", help="Core Health Set CSV.")
+    parser.add_argument("--ood-file", default="WeHMiT-Bench_OOD.csv", help="Out-of-Domain Set CSV.")
     parser.add_argument("--include-ood", dest="include_ood", action="store_true", help="Include the OOD set.")
     parser.add_argument("--exclude-ood", dest="include_ood", action="store_false", help="Exclude the OOD set.")
     parser.set_defaults(include_ood=True)
@@ -314,24 +314,36 @@ def resolve_api_key(model_config):
 
 
 def load_evaluation_data(core_file, ood_file, include_ood, max_records):
+    # Keep the public benchmark schema limited to titles and final labels.
+    def load_subset(file_path, subset):
+        data_frame = pd.read_csv(file_path, encoding="utf-8-sig")
+        required_columns = {"title", "label"}
+        missing_columns = required_columns - set(data_frame.columns)
+        if missing_columns:
+            raise ValueError(f"{file_path} is missing columns: {sorted(missing_columns)}")
+        data_frame = data_frame[["title", "label"]].copy()
+        data_frame["title"] = data_frame["title"].astype(str).str.strip()
+        data_frame["label"] = data_frame["label"].astype(str).str.strip()
+        if data_frame["title"].eq("").any():
+            raise ValueError(f"{file_path} contains an empty title.")
+        invalid_labels = sorted(set(data_frame["label"]) - {"Yes", "No"})
+        if invalid_labels:
+            raise ValueError(f"{file_path} contains invalid labels: {invalid_labels}")
+        data_frame["subset"] = subset
+        data_frame["id"] = [f"{subset}-{index + 1:04d}" for index in range(len(data_frame))]
+        data_frame["gold_label"] = data_frame["label"]
+        return data_frame.drop(columns="label")
+
     # Label the complete Core set separately from the dedicated OOD stress test.
-    core_data = pd.read_csv(core_file, encoding="utf-8-sig")
-    core_data["subset"] = "core_all"
+    core_data = load_subset(core_file, "core_all")
     frames = [core_data]
     if include_ood:
-        ood_data = pd.read_csv(ood_file, encoding="utf-8-sig")
-        ood_data["subset"] = "out_of_domain"
-        frames.append(ood_data)
+        frames.append(load_subset(ood_file, "out_of_domain"))
     evaluation_data = pd.concat(frames, ignore_index=True)
 
-    # Apply a test cap per subset and normalize ids before constructing keys.
+    # Apply a test cap per subset before constructing request keys.
     if max_records > 0:
         evaluation_data = evaluation_data.groupby("subset", group_keys=False).head(max_records).reset_index(drop=True)
-    required_columns = {"id", "title", "gold_label", "subset"}
-    missing_columns = required_columns - set(evaluation_data.columns)
-    if missing_columns:
-        raise ValueError(f"Evaluation data is missing columns: {sorted(missing_columns)}")
-    evaluation_data["id"] = evaluation_data["id"].astype(str)
     return evaluation_data.reset_index(drop=True)
 
 
@@ -1119,9 +1131,9 @@ def make_expected_keys(evaluation_data, model_configs):
 
 
 def make_expected_metadata(evaluation_data, model_configs):
-    # Refresh mutable benchmark annotations without changing title-only request identity.
+    # Refresh public benchmark fields without changing title-only request identity.
     metadata = {}
-    transferable_columns = ["title", "gold_label", "split"]
+    transferable_columns = ["title", "gold_label"]
     for row_index, row in evaluation_data.iterrows():
         current = {column: row[column] for column in transferable_columns if column in evaluation_data.columns}
         current = {key: ("" if pd.isna(value) else value) for key, value in current.items()}
@@ -1186,7 +1198,6 @@ def make_request_record(model_config, row, condition_signature, result, token_bu
         "subset": str(row["subset"]),
         "id": str(row["id"]),
         "title": str(row["title"]),
-        "split": str(row.get("split", "")),
         "gold_label": str(row["gold_label"]),
         "token_budget": int(token_budget),
         "token_stage_index": int(token_stage_index),

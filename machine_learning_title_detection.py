@@ -23,12 +23,12 @@ DEFAULT_OUTPUT_DIR = "experiment_outputs"
 
 
 def parse_args():
-    # Configure fixed data splits, feature capacity, uncertainty, and model export.
+    # Configure the public benchmark input, split sizes, and model settings.
     parser = argparse.ArgumentParser(description="Train and evaluate machine learning classifiers for title detection.")
-    parser.add_argument("--train-file", default=f"{DEFAULT_OUTPUT_DIR}/01_train.csv", help="Training-set CSV.")
-    parser.add_argument("--dev-file", default=f"{DEFAULT_OUTPUT_DIR}/01_dev.csv", help="Development-set CSV.")
-    parser.add_argument("--test-file", default=f"{DEFAULT_OUTPUT_DIR}/01_test.csv", help="Test-set CSV.")
+    parser.add_argument("--data-file", default="WeHMiT-Bench_Core.csv", help="Core Health Set CSV with title and label columns.")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR, help="Directory for classifier outputs.")
+    parser.add_argument("--dev-size", type=int, default=69, help="Number of titles in the development split.")
+    parser.add_argument("--test-size", type=int, default=72, help="Number of titles in the test split.")
 
     # Separate model capacity from bootstrap and persistence controls.
     parser.add_argument("--max-features", type=int, default=80000, help="Maximum TF-IDF character features.")
@@ -39,14 +39,35 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_split(file_path):
-    # Read one preprocessing split and verify the minimal supervised schema.
+def load_benchmark(file_path):
+    # Read the two-column public benchmark and create internal row identifiers.
     data_frame = pd.read_csv(file_path, encoding="utf-8-sig")
-    required_columns = {"id", "title", "gold_label"}
+    required_columns = {"title", "label"}
     missing_columns = required_columns - set(data_frame.columns)
     if missing_columns:
         raise ValueError(f"{file_path} is missing columns: {sorted(missing_columns)}")
-    return data_frame
+    data_frame = data_frame[["title", "label"]].copy()
+    data_frame["title"] = data_frame["title"].astype(str).str.strip()
+    data_frame["label"] = data_frame["label"].astype(str).str.strip()
+    if data_frame["title"].eq("").any():
+        raise ValueError(f"{file_path} contains an empty title.")
+    invalid_labels = sorted(set(data_frame["label"]) - {"Yes", "No"})
+    if invalid_labels:
+        raise ValueError(f"{file_path} contains invalid labels: {invalid_labels}")
+    data_frame["id"] = [f"core-{index + 1:04d}" for index in range(len(data_frame))]
+    return data_frame.rename(columns={"label": "gold_label"})
+
+
+def make_splits(data_frame, dev_size, test_size):
+    # Recover the fixed partitions from the documented row order of the public file.
+    if dev_size <= 0 or test_size <= 0 or dev_size + test_size >= len(data_frame):
+        raise ValueError("Development and test sizes must be positive and leave at least one training title.")
+    train_end = len(data_frame) - dev_size - test_size
+    dev_end = train_end + dev_size
+    train_data = data_frame.iloc[:train_end]
+    dev_data = data_frame.iloc[train_end:dev_end]
+    test_data = data_frame.iloc[dev_end:]
+    return train_data.reset_index(drop=True), dev_data.reset_index(drop=True), test_data.reset_index(drop=True)
 
 
 def make_pipeline(model, max_features):
@@ -234,9 +255,9 @@ def file_sha256(file_path):
 def make_run_signature(args):
     # Bind reusable outputs to data content and all modeling settings.
     signature_data = {
-        "train_sha256": file_sha256(args.train_file),
-        "dev_sha256": file_sha256(args.dev_file),
-        "test_sha256": file_sha256(args.test_file),
+        "data_sha256": file_sha256(args.data_file),
+        "dev_size": args.dev_size,
+        "test_size": args.test_size,
         "max_features": args.max_features,
         "bootstrap_rounds": args.bootstrap_rounds,
         "seed": args.seed,
@@ -270,7 +291,7 @@ def outputs_are_current(output_dir, completion_path, run_signature, force):
 
 
 def main():
-    # Load the immutable train, development, and test partitions.
+    # Load the public benchmark and create reproducible stratified partitions.
     args = parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -279,9 +300,8 @@ def main():
     if outputs_are_current(output_dir, completion_path, run_signature, args.force):
         print(completion_path.read_text(encoding="utf-8"))
         return
-    train_data = load_split(args.train_file)
-    dev_data = load_split(args.dev_file)
-    test_data = load_split(args.test_file).reset_index(drop=True)
+    benchmark_data = load_benchmark(args.data_file)
+    train_data, dev_data, test_data = make_splits(benchmark_data, args.dev_size, args.test_size)
 
     # Tune on development data, then refit selected models on train plus development.
     best_configs, selection_results = select_hyperparameters(train_data, dev_data, args.max_features, args.seed)

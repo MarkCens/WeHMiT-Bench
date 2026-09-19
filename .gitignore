@@ -5,6 +5,10 @@ model.local.json
 .env.*
 !.env.example
 
+# Internal annotation and review records
+WeHMiT-Bench.xlsx
+review_records/
+
 # Python environments and caches
 __pycache__/
 *.py[cod]
@@ -37,4 +41,3 @@ temp/
 .DS_Store
 Thumbs.db
 desktop.ini
-

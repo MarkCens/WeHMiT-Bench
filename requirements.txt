@@ -1,9 +1,6 @@
 joblib
-matplotlib
 numpy
 openai
-openpyxl
 pandas
 scikit-learn
 scipy
-

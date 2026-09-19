@@ -4,13 +4,13 @@ WeHMiT-Bench evaluates health misinformation detection in Chinese WeChat article
 
 ## Files
 
-- `WeHMiT-Bench.xlsx`: verified annotation workbook.
-- `WeHMiT-Bench_Core.csv`: 460 labeled health titles with fixed data splits.
+- `WeHMiT-Bench_Core.csv`: 460 labeled health titles.
 - `WeHMiT-Bench_OOD.csv`: 63 labeled titles outside the health domain.
-- `prepare_benchmark_data.py`: data preparation.
 - `llm_title_detection.py`: LLM title detection.
 - `machine_learning_title_detection.py`: machine learning title detection.
 - `model.example.json`: API configuration example without keys.
+
+Both benchmark files contain only `title` and the expert-verified final `label` (`Yes` or `No`). Internal annotation and review records are not included.
 
 ## Setup
 
@@ -23,9 +23,10 @@ Copy `model.example.json` to `model.json` and provide API keys through the envir
 ## Usage
 
 ```bash
-python llm_title_detection.py --core-file WeHMiT-Bench_Core.csv --ood-file WeHMiT-Bench_OOD.csv
-python prepare_benchmark_data.py
+python llm_title_detection.py
 python machine_learning_title_detection.py
 ```
+
+To preserve the fixed partitions without adding a third field, the Core file is ordered as 319 training titles, 69 development titles, and 72 test titles. The machine learning script reads these ranges directly.
 
 Generated outputs are written to `experiment_outputs/` and excluded by `.gitignore`.
